@@ -1,0 +1,4 @@
+BACKUP_NAME="$COMPUTER_NAME.applications.backup"
+SOURCE="$HOME/Applications"
+TARGET="encgd:/"
+DESTINATION="$HOME/Desktop/gd_applications"

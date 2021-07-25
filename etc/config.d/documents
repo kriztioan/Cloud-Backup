@@ -1,0 +1,4 @@
+BACKUP_NAME="$COMPUTER_NAME.documents.backup"
+SOURCE="$HOME/Documents"
+TARGET="encgd:/"
+DESTINATION="$HOME/Desktop/gd_documents"

@@ -1,0 +1,17 @@
+NETWORK=MyNetworkSSID
+COMPUTER_NAME=$(scutil --get LocalHostName)
+SUPPORT_FOLDER="$HOME/Library/Application Support/Cloud Backup"
+VOLUME_FOLDER="/Volumes"
+LOCK_FILE="lock"
+TIMESTAMP_FILE="timestamp"
+LOG_FILE="cloud_backup.log"
+ICON="$SUPPORT_FOLDER/share/icon.icns"
+DAR_BYTES=$(( 1024 * 1024 * 512 ))
+DAR_SCRIPT="$SUPPORT_FOLDER/bin/cloud_slice.duc"
+LAUNCH_AGENT_FOLDER="$HOME/Library/LaunchAgents"
+PERIODIC_LAUNCH_AGENT="net.ddns.christiaanboersma.cloud_backup.periodic"
+DAY_INTERVAL=3
+DAYS_REPORT=3
+DB_FILE="cloud_backup.db"
+MANAGER_FILE="cloud_manager.mdb"
+RCLONE_OPTS="-q --low-level-retries 12 --retries 12"
