@@ -281,6 +281,12 @@ function main {
 
     message "workspace created at $WORKSPACE"
 
+    # Stop mediaanalysisd
+
+    launchctl disable gui/$UID/com.apple.mediaanalysisd
+
+    launchctl kill -TERM gui/$UID/com.apple.mediaanalysisd
+
     # Stop photoanalysisd
 
     launchctl disable gui/$UID/com.apple.photoanalysisd

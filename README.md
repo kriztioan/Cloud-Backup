@@ -47,6 +47,7 @@ The first argument again matches a file in `etc/config.d` and the second argumen
 2. Despite the incremental backups, cloud space requirements will only grow. A feature is in the works that allows pruning down to an earlier backup `level`.
 3. Logging is done to `Library/Logs/cloud_backup.log` in your home directory.
 4. `dar`, `par2`, and `rclone` paths are hardcoded to be in  `/usr/local/bin`.
+5. `unbuffer` is used to disable output buffering and can be readily installed with [Homebrew](https://brew.sh).
 
 ## BSD-3 License
 
