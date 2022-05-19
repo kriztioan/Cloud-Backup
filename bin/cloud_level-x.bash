@@ -334,6 +334,10 @@ function main {
         done
     fi
 
+    # Re-start mediaanalysisd
+
+    launchctl disable gui/$UID/com.apple.mediaanalysisd
+
     # Re-start photoanalysisd
 
     launchctl enable gui/$UID/com.apple.photoanalysisd
