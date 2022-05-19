@@ -41,10 +41,28 @@ The first argument matches a file in `etc/config.d`. Use `cloud_restore_file.bas
 
 The first argument again matches a file in `etc/config.d` and the second argument is the file to restore.
 
+## Trimming backups
+
+Trimming backups is done with `cloud_trim.bash` from the `bin` directory:
+
+```shell
+./cloud_trim.bash documents 10
+```
+
+The first argument matches a file in `etc/config.d` and the second the level to trim up to.
+
+Take care to follow up with a level-x backup:
+
+```shell
+./cloud_level-x.bash documents
+```
+
+Note that this may take significantly longer than usual, as the increment will be against and earlier backup.
+
 ## Notes
 
 1. Cloud storage is required and [rclone](https://rclone.org) needs to be configured to access it.
-2. Despite the incremental backups, cloud space requirements will only grow. A feature is in the works that allows pruning down to an earlier backup `level`.
+2. Despite incremental backups, cloud space requirements will only grow. Use `cloud_trim.bash` to trim backups followed by a `cloud_level-x.bash` backup.
 3. Logging is done to `Library/Logs/cloud_backup.log` in your home directory.
 4. `dar`, `par2`, and `rclone` paths are hardcoded to be in  `/usr/local/bin`.
 5. `unbuffer` is used to disable output buffering and can be readily installed with [Homebrew](https://brew.sh).
