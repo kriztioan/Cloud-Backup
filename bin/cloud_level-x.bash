@@ -34,396 +34,400 @@ source "$SUPPORT_FOLDER/lib/manager.bash"
 
 function backup {
 
-    # Check for target
+  # Check for target
 
-    message "checking target"
+  message "checking target"
 
-    /usr/local/bin/rclone ls "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
+  /usr/local/bin/rclone ls "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
 
-    if [ ! $? -eq 0 ]; then
+  if [ ! $? -eq 0 ]; then
 
-        message "target ($TARGET) not available... terminating"
+    message "target ($TARGET) not available... terminating"
 
-        if [ -e /usr/local/bin/growlnotify ]; then
+    if [ -e /usr/local/bin/growlnotify ]; then
 
-            /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: Target not available, please configure $TARGET and/or check your internet connection" &>/dev/null
-        fi
-
-        return 1
+      /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: Target not available, please configure $TARGET and/or check your internet connection" &>/dev/null
     fi
 
-    # Check for source
+    return 1
+  fi
 
-    message "checking source"
+  # Check for source
 
-    if [ ! -d "$SOURCE" ]; then
+  message "checking source"
 
-        message "source ($SOURCE) not available... terminating"
+  if [ ! -d "$SOURCE" ]; then
 
-        if [ -e /usr/local/bin/growlnotify ]; then
+    message "source ($SOURCE) not available... terminating"
 
-            /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: Source not available, please attach the network/USB-drive containing $SOURCE" &>/dev/null
-        fi
+    if [ -e /usr/local/bin/growlnotify ]; then
 
-        return 2
+      /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: Source not available, please attach the network/USB-drive containing $SOURCE" &>/dev/null
     fi
 
-    # Getting last update
+    return 2
+  fi
 
-    db_last "$BACKUP_NAME"
+  # Getting last update
 
-    if [ $? -ne 0 ]; then
+  db_last "$BACKUP_NAME"
 
-        message "no backups found... terminating"
+  if [ $? -ne 0 ]; then
 
-        message "all periodic level-x backups have been canceled"
+    message "no backups found... terminating"
 
-        if [ -e /usr/local/bin/growlnotify ]; then
+    message "all periodic level-x backups have been canceled"
 
-            /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: No backups found, please perform one manually first; all periodic level-x backups have been canceled" &>/dev/null
-        fi
+    if [ -e /usr/local/bin/growlnotify ]; then
 
-        return 3
+      /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: No backups found, please perform one manually first; all periodic level-x backups have been canceled" &>/dev/null
     fi
 
-    message "last update (level-$LEVEL) dated $(date -r $DATE)"
+    return 3
+  fi
 
-    /usr/local/bin/rclone copy "$TARGET$BACKUP_NAME"."$LEVEL".catalogue.1.dar . $RCLONE_OPTS 2>/dev/null
+  message "last update (level-$LEVEL) dated $(date -r $DATE)"
 
-    if [ ! $? -eq 0 ]; then
+  /usr/local/bin/rclone copy "$TARGET$BACKUP_NAME"."$LEVEL".catalogue.1.dar . $RCLONE_OPTS 2>/dev/null
 
-        message "no level-$LEVEL catalogue found... terminating"
+  if [ ! $? -eq 0 ]; then
 
-        message "all periodic level-x backups have been canceled"
+    message "no level-$LEVEL catalogue found... terminating"
 
-        if [ -e /usr/local/bin/growlnotify ]; then
+    message "all periodic level-x backups have been canceled"
 
-            /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: No level-$LEVEL backup found, please perform one manually first; all periodic level-x backups have been canceled" &>/dev/null
-        fi
+    if [ -e /usr/local/bin/growlnotify ]; then
 
-        return 4
+      /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: No level-$LEVEL backup found, please perform one manually first; all periodic level-x backups have been canceled" &>/dev/null
     fi
 
-    message "retrieved level-$LEVEL catalogue"
+    return 4
+  fi
 
-    LEVEL=$(($LEVEL + 1))
+  message "retrieved level-$LEVEL catalogue"
 
-    # Do dar
+  LEVEL=$(($LEVEL + 1))
 
-    echo -n 0 >wait_pid
+  # Do dar
 
-    message "dar started"
+  echo -n 0 >wait_pid
 
-    message "doing a level-$LEVEL backup"
+  message "dar started"
 
-    caffeinate /usr/local/bin/dar -q -Q -asecu \
-        -c "$BACKUP_NAME"."$LEVEL" \
-        -s "$DAR_BYTES" \
-        -R "$SOURCE" \
-        -E "'$DAR_SCRIPT' create %b.%N.dar $TARGET %n $BACKUP_NAME.$LEVEL" \
-        -A "$BACKUP_NAME".$(($LEVEL - 1))".catalogue" \
-        --min-digits 6 \
-        --on-fly-isolate "$BACKUP_NAME.$LEVEL.catalogue" \
-        --exclude ".DS_Store" \
-        --prune ".DocumentRevisions-V100" \
-        --prune ".TemporaryItems" \
-        --prune ".Trashes"
+  message "doing a level-$LEVEL backup"
 
-    DAR_CODE=$?
+  caffeinate /usr/local/bin/dar -q -Q -asecu \
+    -c "$BACKUP_NAME"."$LEVEL" \
+    -s "$DAR_BYTES" \
+    -R "$SOURCE" \
+    -E "'$DAR_SCRIPT' create %b.%N.dar $TARGET %n $BACKUP_NAME.$LEVEL" \
+    -A "$BACKUP_NAME".$(($LEVEL - 1))".catalogue" \
+    --min-digits 6 \
+    --on-fly-isolate "$BACKUP_NAME.$LEVEL.catalogue" \
+    --exclude ".DS_Store" \
+    --prune ".DocumentRevisions-V100" \
+    --prune ".TemporaryItems" \
+    --prune ".Trashes"
 
-    rm -f "$BACKUP_NAME".$(($LEVEL - 1))".catalogue"
+  DAR_CODE=$?
 
-    message "dar finished with code $DAR_CODE"
+  rm -f "$BACKUP_NAME".$(($LEVEL - 1))".catalogue"
 
-    if [ $DAR_CODE -ne 0 ]; then
+  message "dar finished with code $DAR_CODE"
 
-        message "please check the log file for any errors/warnings"
+  if [ $DAR_CODE -ne 0 ]; then
 
-        if [ -e /usr/local/bin/growlnotify ]; then
+    message "please check the log file for any errors/warnings"
 
-            /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: WARNING/ERRORS encountered; please check the log file" &>/dev/null
-        fi
+    if [ -e /usr/local/bin/growlnotify ]; then
+
+      /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$BACKUP_NAME: WARNING/ERRORS encountered; please check the log file" &>/dev/null
     fi
+  fi
 
-    WAIT_PID=$(cat wait_pid)
+  WAIT_PID=$(cat wait_pid)
 
-    if [ $WAIT_PID -ne 0 ]; then
+  if [ $WAIT_PID -ne 0 ]; then
 
-        message "- wait on $(printf "$BACKUP_NAME.$LEVEL.%06d.dar" $(cat "$BACKUP_NAME".$LEVEL.slices))"
+    message "- wait on $(printf "$BACKUP_NAME.$LEVEL.%06d.dar" $(cat "$BACKUP_NAME".$LEVEL.slices))"
 
-        while kill -0 "$WAIT_PID" 2>/dev/null; do
+    while kill -0 "$WAIT_PID" 2>/dev/null; do
 
-            sleep 0.5
-        done
-    fi
+      sleep 0.5
+    done
+  fi
 
-    rm -f wait_pid
+  rm -f wait_pid
 
-    BYTES=$(cat ./"$BACKUP_NAME"."$LEVEL".bytes)
+  BYTES=$(cat ./"$BACKUP_NAME"."$LEVEL".bytes)
 
-    rm -f ./"$BACKUP_NAME"."$LEVEL".bytes
+  rm -f ./"$BACKUP_NAME"."$LEVEL".bytes
 
-    message "$BACKUP_NAME: archived $(human $BYTES)"
+  message "$BACKUP_NAME: archived $(human $BYTES)"
 
-    TOTAL_BYTES=$(($TOTAL_BYTES + $BYTES))
+  TOTAL_BYTES=$(($TOTAL_BYTES + $BYTES))
 
-    # Archiving level-x catalogue
+  # Archiving level-x catalogue
 
-    message "archiving level-$LEVEL catalogue"
+  message "archiving level-$LEVEL catalogue"
 
-    /usr/local/bin/rclone copy "$BACKUP_NAME"."$LEVEL".catalogue.1.dar "$TARGET" $RCLONE_OPTS
+  /usr/local/bin/rclone copy "$BACKUP_NAME"."$LEVEL".catalogue.1.dar "$TARGET" $RCLONE_OPTS
 
-    # Commit to database
+  # Commit to database
 
-    message "committing to database"
+  message "committing to database"
 
-    db_insert "$BACKUP_NAME" $LEVEL $BYTES $(cat "$BACKUP_NAME".$LEVEL.slices)
+  db_insert "$BACKUP_NAME" $LEVEL $BYTES $(cat "$BACKUP_NAME".$LEVEL.slices)
 
-    rm -f "$BACKUP_NAME".$LEVEL.slices
+  rm -f "$BACKUP_NAME".$LEVEL.slices
 
-    # Add catalogue to manager
+  # Add catalogue to manager
 
-    message "adding catalogue to manager"
+  message "adding catalogue to manager"
 
-    manager_add "$BACKUP_NAME"."$LEVEL".catalogue "$BACKUP_NAME"."$LEVEL "
+  manager_add "$BACKUP_NAME"."$LEVEL".catalogue "$BACKUP_NAME"."$LEVEL "
 
-    rm -f "$BACKUP_NAME"."$LEVEL".catalogue.1.dar
+  rm -f "$BACKUP_NAME"."$LEVEL".catalogue.1.dar
 
-    return 0
+  return 0
 }
 
 function main {
 
-    # Starting
+  # Starting
 
-    TIMESTAMP=$(date +"%s")
+  TIMESTAMP=$(date +"%s")
 
-    message "starting incremental backup to the Cloud (PID $$)"
+  message "starting incremental backup to the Cloud (PID $$)"
 
-    # Unload the launch agent
+  # Unload the launch agent
 
-    ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>&1)
+  AGENT=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>&1)
 
-    if [ $? -eq "0" ]; then
+  AGENT_ACTIVE=$?
 
-        launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+  if [ "$AGENT_ACTIVE" -eq "0" ]; then
 
-        message "unloaded $PERIODIC_LAUNCH_AGENT"
+    launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+
+    message "unloaded $PERIODIC_LAUNCH_AGENT"
+  fi
+
+  # Check for Growl and when available notify
+
+  if [ -e /usr/local/bin/growlnotify ]; then
+
+    /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$(date +"Incremental backup to the Cloud started at %A %d %b %Y, %H:%M:%S")" &>/dev/null
+  fi
+
+  # Check for lock file
+
+  if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+
+    message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+
+    PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+
+    message "cloud backup already running with pid $PID... terminating"
+
+    exit 0
+  fi
+
+  # Write lock file
+
+  echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
+
+  message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
+
+  # Connect to data database
+
+  db_connect
+
+  if [ "$?" -ne 0 ]; then
+
+    message "failed to connect to database... terminating"
+
+    exit 0
+  fi
+
+  message "connected to database"
+
+  # Init manager
+
+  manager_init
+
+  message "manager initialized"
+
+  # Create work space
+
+  message "creating workspace"
+
+  WORKSPACE=$(mktemp -d -t cloud_backup)
+
+  RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (2 * $DAR_BYTES / 1024) / 10)))
+
+  if [ "$?" -ne 0 ]; then
+
+    message "unable to create workspace... terminating"
+
+    exit 0
+  fi
+
+  newfs_hfs $RAM_DEV >/dev/null
+
+  mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
+
+  CWD=$(pwd -P)
+
+  cd "$WORKSPACE"
+
+  message "workspace created at $WORKSPACE"
+
+  # Stop mediaanalysisd
+
+  launchctl disable gui/$UID/com.apple.mediaanalysisd
+
+  launchctl kill -TERM gui/$UID/com.apple.mediaanalysisd
+
+  # Stop photoanalysisd
+
+  launchctl disable gui/$UID/com.apple.photoanalysisd
+
+  launchctl kill -TERM gui/$UID/com.apple.photoanalysisd
+
+  # Loop over sources
+
+  TOTAL_BYTES=0
+
+  if [ $# -gt 0 ]; then
+
+    source "$SUPPORT_FOLDER"/etc/config.d/"$1"
+
+    message "doing $BACKUP_NAME"
+
+    backup
+
+    if [ $? -ne 0 ]; then
+
+      message "$BACKUP_NAME failed... terminating"
+
+      abort 0
     fi
 
-    # Check for Growl and when available notify
+    message "completed $BACKUP_NAME"
+  else
 
-    if [ -e /usr/local/bin/growlnotify ]; then
+    for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
 
-        /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$(date +"Incremental backup to the Cloud started at %A %d %b %Y, %H:%M:%S")" &>/dev/null
-    fi
+      source "$CONFIG"
 
-    # Check for lock file
+      message "Doing $BACKUP_NAME"
 
-    if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+      backup
 
-        message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+      if [ $? -ne 0 ]; then
 
-        PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+        message "$BACKUP_NAME failed... terminating"
 
-        message "cloud backup already running with pid $PID... terminating"
+        abort 0
+      fi
 
-        exit 0
-    fi
+      message "completed $BACKUP_NAME"
+    done
+  fi
 
-    # Write lock file
+  # Re-start mediaanalysisd
 
-    echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
+  launchctl disable gui/$UID/com.apple.mediaanalysisd
 
-    message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
+  # Re-start photoanalysisd
 
-    # Connect to data database
+  launchctl enable gui/$UID/com.apple.photoanalysisd
 
-    db_connect
+  # Save database
 
-    if [ "$?" -ne 0 ]; then
+  /usr/local/bin/rclone copy "$SUPPORT_FOLDER/share/$DB_FILE" "$TARGET" $RCLONE_OPTS
 
-        message "failed to connect to database... terminating"
+  message "database saved"
 
-        exit 0
-    fi
+  # Save manager
 
-    message "connected to database"
+  /usr/local/bin/rclone copy "$SUPPORT_FOLDER/share/$MANAGER_FILE" "$TARGET" $RCLONE_OPTS
 
-    # Init manager
+  message "manager saved"
 
-    manager_init
+  # Save timestamp
 
-    message "manager initialized"
+  date +"%s" >"$SUPPORT_FOLDER/var/$TIMESTAMP_FILE"
 
-    # Create work space
+  /usr/local/bin/rclone copy "$SUPPORT_FOLDER/var/$TIMESTAMP_FILE" "$TARGET" $RCLONE_OPTS
 
-    message "creating workspace"
+  message "timestamp saved"
 
-    WORKSPACE=$(mktemp -d -t cloud_backup)
+  # Cleanup
 
-    RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (2 * $DAR_BYTES / 1024) / 10)))
+  cleanup
 
-    if [ "$?" -ne 0 ]; then
+  # Write launch agent
 
-        message "unable to create workspace... terminating"
-
-        exit 0
-    fi
-
-    newfs_hfs $RAM_DEV >/dev/null
-
-    mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
-
-    CWD=$(pwd -P)
-
-    cd "$WORKSPACE"
-
-    message "workspace created at $WORKSPACE"
-
-    # Stop mediaanalysisd
-
-    launchctl disable gui/$UID/com.apple.mediaanalysisd
-
-    launchctl kill -TERM gui/$UID/com.apple.mediaanalysisd
-
-    # Stop photoanalysisd
-
-    launchctl disable gui/$UID/com.apple.photoanalysisd
-
-    launchctl kill -TERM gui/$UID/com.apple.photoanalysisd
-
-    # Loop over sources
-
-    TOTAL_BYTES=0
-
-    if [ $# -gt 0 ]; then
-
-        source "$SUPPORT_FOLDER"/etc/config.d/"$1"
-
-        message "Doing $BACKUP_NAME"
-
-        backup
-
-        if [ $? -ne 0 ]; then
-
-            message "$BACKUP_NAME failed... terminating"
-
-            abort 0
-        fi
-
-        message "Completed $BACKUP_NAME"
-    else
-
-        for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
-
-            source "$CONFIG"
-
-            message "Doing $BACKUP_NAME"
-
-            backup
-
-            if [ $? -ne 0 ]; then
-
-                message "$BACKUP_NAME failed... terminating"
-
-                abort 0
-            fi
-
-            message "Completed $BACKUP_NAME"
-        done
-    fi
-
-    # Re-start mediaanalysisd
-
-    launchctl disable gui/$UID/com.apple.mediaanalysisd
-
-    # Re-start photoanalysisd
-
-    launchctl enable gui/$UID/com.apple.photoanalysisd
-
-    # Save database
-
-    /usr/local/bin/rclone delete "$TARGET$DB_FILE" $RCLONE_OPTS
-
-    /usr/local/bin/rclone copy "$SUPPORT_FOLDER/share/$DB_FILE" "$TARGET" $RCLONE_OPTS
-
-    message "database saved"
-
-    # Save timestamp
-
-    date +"%s" >"$SUPPORT_FOLDER/var/$TIMESTAMP_FILE"
-
-    /usr/local/bin/rclone delete "$TARGET$TIMESTAMP_FILE" -q
-
-    /usr/local/bin/rclone copy "$SUPPORT_FOLDER/var/$TIMESTAMP_FILE" "$TARGET" $RCLONE_OPTS
-
-    message "timestamp saved"
-
-    # Cleanup
-
-    cleanup
-
-    # Write launch agent
-
-    cat >"$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist" <<EOL
+  cat >"$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist" <<EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>StartCalendarInterval</key>
-	<dict>
-		<key>Minute</key>
-	   	<integer>0</integer>
-		<key>Hour</key>
-		<integer>10</integer>
-		<key>Day</key>
-		<integer>$(date -v +${DAY_INTERVAL}d +"%d")</integer>
-		<key>Month</key>
-		<integer>$(date -v +${DAY_INTERVAL}d +"%m")</integer>
-	</dict>
-	<key>Label</key>
-	<string>net.ddns.christiaanboersma.cloud_backup.periodic</string>
-	<key>LowPriorityIO</key>
-	<true/>
-	<key>Nice</key>
-	<integer>1</integer>
-	<key>Program</key>
-	<string>/bin/sh</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>sh</string>
-		<string>-c</string>
-		<string>$HOME/Library/Application\ Support/Cloud\ Backup/bin/cloud_level-x.bash</string>
-	</array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Minute</key>
+       <integer>0</integer>
+    <key>Hour</key>
+    <integer>10</integer>
+    <key>Day</key>
+    <integer>$(date -v +${DAY_INTERVAL}d +"%d")</integer>
+    <key>Month</key>
+    <integer>$(date -v +${DAY_INTERVAL}d +"%m")</integer>
+  </dict>
+  <key>Label</key>
+  <string>com.christiaanboersma.cloud_backup.periodic</string>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>1</integer>
+  <key>Program</key>
+  <string>/bin/sh</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>sh</string>
+    <string>-c</string>
+    <string>$HOME/Library/Application\ Support/Cloud\ Backup/bin/cloud_level-x.bash</string>
+  </array>
 </dict>
 </plist>
 EOL
 
-    message "written $PERIODIC_LAUNCH_AGENT"
+  message "written $PERIODIC_LAUNCH_AGENT"
 
-    message "next incremental backup scheduled to run at 10:00 AM on $(date -v +${DAY_INTERVAL}d +"%A, %B %e %Y")"
+  message "next incremental backup scheduled to run at 10:00 AM on $(date -v +${DAY_INTERVAL}d +"%A, %B %e %Y")"
 
-    # Load launch agent
+  # Load launch agent
 
-    launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+  launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-    message "loaded $PERIODIC_LAUNCH_AGENT"
+  message "loaded $PERIODIC_LAUNCH_AGENT"
 
-    # Done
+  # Done
 
-    ELAPSED=$(($(date "+%s") - $TIMESTAMP))
+  ELAPSED=$(($(date "+%s") - $TIMESTAMP))
 
-    DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
+  DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
 
-    message "completed incremental backup to the Cloud in $DELTA"
+  message "completed incremental backup to the Cloud in $DELTA"
 
-    # Check for Growl and when available notify
+  # Check for Growl and when available notify
 
-    if [ -e /usr/local/bin/growlnotify ]; then
+  if [ -e /usr/local/bin/growlnotify ]; then
 
-        /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$(date +"Completed incremental backup to the Cloud at %A %d %b %Y, %H:%M:%S; archived $(human $TOTAL_BYTES) in $DELTA ")" &>/dev/null
-    fi
+    /usr/local/bin/growlnotify --sticky --name "Cloud Backup" --image "$ICON" --title "Cloud Backup" --message "$(date +"Completed incremental backup to the Cloud at %A %d %b %Y, %H:%M:%S; archived $(human $TOTAL_BYTES) in $DELTA ")" &>/dev/null
+  fi
 }
 
 main "$@" >>"$HOME/Library/Logs/$LOG_FILE" 2>&1

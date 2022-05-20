@@ -23,7 +23,7 @@ From the `bin` directory run:
 
 This could take a while.
 
-Copy `net.ddns.christiaanboersma.cloud_backup.plist` from the `share` folder to `Library/LaunchAgents` in your home directory. Log out and back in.
+Copy `net.christiaanboersma.cloud_backup.plist` from the `share` folder to `Library/LaunchAgents` in your home directory. Log out and back in.
 
 ## Restoring from backup
 

@@ -9,50 +9,50 @@
 ###############################################
 
 function message {
-    /usr/local/bin/unbuffer echo "$(date "+%m-%d-%Y %H:%M:%S: $1")"
+  /usr/local/bin/unbuffer echo "$(date "+%m-%d-%Y %H:%M:%S: $1")"
 }
 
 function human() {
 
-    echo $1 | awk 'function human(x) {
+  echo $1 | awk 'function human(x) {
                      s=" B   KiB MiB GiB TiB EiB PiB YiB ZiB"
-                     while (x>=1024 && length(s)>1)
-               	       {x/=1024; s=substr(s,5)}
-                     s=substr(s,1,4)
-                     xf=(s==" B  ")?"%5d   ":"%8.2f"
-                     return sprintf( xf"%s\n", x, s)
-                   }
-                   {gsub(/^[0-9]+/, human($1)); print}'
+                while (x>=1024 && length(s)>1)
+                      {x/=1024; s=substr(s,5)}
+                s=substr(s,1,4)
+                xf=(s==" B  ")?"%5d   ":"%8.2f"
+                return sprintf( xf"%s\n", x, s)
+             }
+             {gsub(/^[0-9]+/, human($1)); print}'
 }
 
 function cleanup {
 
-    # Wait for things to finish
+  # Wait for things to finish
 
-    sleep 5
+  sleep 5
 
-    # Cleaning up work space
+  # Cleaning up work space
 
-    message "cleaning up work space"
+  message "cleaning up work space"
 
-    cd "$CWD"
+  cd "$CWD"
 
-    diskutil quiet unmount "$WORKSPACE"
+  diskutil quiet unmount "$WORKSPACE"
 
-    diskutil quiet eject $RAM_DEV
+  diskutil quiet eject $RAM_DEV
 
-    rm -rf "$WORKSPACE"
+  rm -rf "$WORKSPACE"
 
-    # Remove lock file
+  # Remove lock file
 
-    rm "$SUPPORT_FOLDER/var/$LOCK_FILE"
+  rm "$SUPPORT_FOLDER/var/$LOCK_FILE"
 
-    message "removed lock file at $SUPPORT_FOLDER/var/$LOCK_FILE"
+  message "removed lock file at $SUPPORT_FOLDER/var/$LOCK_FILE"
 }
 
 function abort {
 
-    cleanup
+  cleanup
 
-    exit "$1"
+  exit "$1"
 }

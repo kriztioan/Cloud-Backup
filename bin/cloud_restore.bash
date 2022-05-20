@@ -26,225 +26,225 @@ source "$SUPPORT_FOLDER/lib/db.bash"
 
 function restore {
 
-    # Check for target
+  # Check for target
 
-    message "checking target"
+  message "checking target"
 
-    rclone ls "$TARGET" -q >/dev/null 2>&1
+  rclone ls "$TARGET" -q >/dev/null 2>&1
 
-    if [ ! $? -eq 0 ]; then
+  if [ ! $? -eq 0 ]; then
 
-        message "target ($TARGET) not available... terminating"
+    message "target ($TARGET) not available... terminating"
 
-        return 1
+    return 1
+  fi
+
+  db_last "$BACKUP_NAME"
+
+  if [ $? -ne 0 ]; then
+
+    message "no backups found... terminating"
+
+    return 2
+  fi
+
+  message "checking destination"
+
+  if [ ! -d "$DESTINATION" ]; then
+
+    message "destination ($DESTINATION) does not exist... creating"
+
+    mkdir "$DESTINATION"
+  fi
+
+  message "last update (level-$LEVEL) dated $(date -r $DATE)"
+
+  L=0
+
+  until [ $L -gt $LEVEL ]; do
+
+    # Retrieve slices
+
+    rclone copy "$TARGET$BACKUP_NAME"."$L".slices . -q >/dev/null 2>&1
+
+    NSLICES=$(cat "$BACKUP_NAME"."$L".slices)
+
+    LAST_SLICE=$(printf "$BACKUP_NAME.$L.%06d.dar" "$NSLICES")
+
+    echo -n 0 >wait_pid
+
+    "$DAR_SCRIPT" catalogue "$LAST_SLICE" "$TARGET" "$NSLICES" "$BACKUP_NAME"."$L"
+
+    # Restore
+
+    message "dar started"
+
+    message "restoring level-$L backup"
+
+    /usr/local/bin/dar -x "$BACKUP_NAME"."$L" -q -9 6 -O -w -Q \
+      -R "$DESTINATION" \
+      -E "'$DAR_SCRIPT' extract %b.%N.dar $TARGET %n %b $NSLICES"
+
+    DAR_CODE=$?
+
+    message "dar finished with code $DAR_CODE"
+
+    if [ $DAR_CODE -ne 0 ]; then
+
+      message "please check the log file for any errors/warnings"
     fi
 
-    db_last "$BACKUP_NAME"
+    rm -f "$LAST_SLICE"
 
-    if [ $? -ne 0 ]; then
+    L=$(($L + 1))
+  done
 
-        message "no backups found... terminating"
-
-        return 2
-    fi
-
-    message "checking destination"
-
-    if [ ! -d "$DESTINATION" ]; then
-
-        message "destination ($DESTINATION) does not exist... creating"
-
-        mkdir "$DESTINATION"
-    fi
-
-    message "last update (level-$LEVEL) dated $(date -r $DATE)"
-
-    L=0
-
-    until [ $L -gt $LEVEL ]; do
-
-        # Retrieve slices
-
-        rclone copy "$TARGET$BACKUP_NAME"."$L".slices . -q >/dev/null 2>&1
-
-        NSLICES=$(cat "$BACKUP_NAME"."$L".slices)
-
-        LAST_SLICE=$(printf "$BACKUP_NAME.$L.%06d.dar" "$NSLICES")
-
-        echo -n 0 >wait_pid
-
-        "$DAR_SCRIPT" catalogue "$LAST_SLICE" "$TARGET" "$NSLICES" "$BACKUP_NAME"."$L"
-
-        # Restore
-
-        message "dar started"
-
-        message "restoring level-$L backup"
-
-        /usr/local/bin/dar -x "$BACKUP_NAME"."$L" -q -9 6 -O -w -Q \
-            -R "$DESTINATION" \
-            -E "'$DAR_SCRIPT' extract %b.%N.dar $TARGET %n %b $NSLICES"
-
-        DAR_CODE=$?
-
-        message "dar finished with code $DAR_CODE"
-
-        if [ $DAR_CODE -ne 0 ]; then
-
-            message "please check the log file for any errors/warnings"
-        fi
-
-        rm -f "$LAST_SLICE"
-
-        L=$(($L + 1))
-    done
-
-    return 0
+  return 0
 }
 
 function main {
 
-    # Starting
+  # Starting
 
-    message "starting restore from Cloud (PID $$)"
+  message "starting restore from the Cloud (PID $$)"
 
-    TIMESTAMP=$(date +"%s")
+  TIMESTAMP=$(date +"%s")
 
-    # Unload the launch agent
+  # Unload the launch agent
 
-    ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>&1)
+  ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>&1)
 
-    SCHEDULED=$?
+  SCHEDULED=$?
 
-    if [ $SCHEDULED -eq "0" ]; then
+  if [ $SCHEDULED -eq "0" ]; then
 
-        launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+    launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-        message "unloaded $PERIODIC_LAUNCH_AGENT"
+    message "unloaded $PERIODIC_LAUNCH_AGENT"
+  fi
+
+  # Check for lock file
+
+  if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+
+    message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+
+    PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+
+    message "cloud backup already running with pid $PID... terminating"
+
+    return 2
+  fi
+
+  # Write lock file
+
+  echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
+
+  message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
+
+  # Connect to data database
+
+  db_connect
+
+  if [ "$?" -ne 0 ]; then
+
+    message "failed to connect to database... terminating"
+
+    exit 0
+  fi
+
+  message "connected to database"
+
+  # Init manager
+
+  manager_init
+
+  message "manager initialized"
+
+  # Create work space
+
+  message "creating workspace"
+
+  WORKSPACE=$(mktemp -d -t cloud_backup)
+
+  RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (3 * $DAR_BYTES / 1024) / 10)))
+
+  if [ "$?" -ne 0 ]; then
+
+    message "unable to create workspace... terminating"
+
+    exit 0
+  fi
+
+  newfs_hfs $RAM_DEV >/dev/null
+
+  mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
+
+  CWD=$(pwd -P)
+
+  cd "$WORKSPACE"
+
+  message "workspace created at $WORKSPACE"
+
+  # Loop over sources
+
+  if [ $# -gt 0 ]; then
+
+    source "$SUPPORT_FOLDER"/etc/config.d/"$1"
+
+    message "Doing $BACKUP_NAME"
+
+    restore
+
+    if [ $? -ne 0 ]; then
+
+      message "$BACKUP_NAME failed... terminating"
+
+      abort 0
     fi
 
-    # Check for lock file
+    message "Completed $BACKUP_NAME"
+  else
 
-    if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+    for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
 
-        message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+      source "$CONFIG"
 
-        PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+      message "Doing $BACKUP_NAME"
 
-        message "cloud backup already running with pid $PID... terminating"
+      restore
 
-        return 2
-    fi
+      if [ $? -ne 0 ]; then
 
-    # Write lock file
+        message "$BACKUP_NAME failed... terminating"
 
-    echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
+        abort 0
+      fi
 
-    message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
+      message "Completed $BACKUP_NAME"
+    done
+  fi
 
-    # Connect to data database
+  # Cleanup
 
-    db_connect
+  cleanup
 
-    if [ "$?" -ne 0 ]; then
+  # Load launch agents
 
-        message "failed to connect to database... terminating"
+  if [ $SCHEDULED -eq "0" ]; then
 
-        exit 0
-    fi
+    launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-    message "connected to database"
+    message "loaded $PERIODIC_LAUNCH_AGENT"
+  fi
 
-    # Init manager
+  # Done
 
-    manager_init
+  ELAPSED=$(($(date "+%s") - $TIMESTAMP))
 
-    message "manager initialized"
+  DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
 
-    # Create work space
-
-    message "creating workspace"
-
-    WORKSPACE=$(mktemp -d -t cloud_backup)
-
-    RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (3 * $DAR_BYTES / 1024) / 10)))
-
-    if [ "$?" -ne 0 ]; then
-
-        message "unable to create workspace... terminating"
-
-        exit 0
-    fi
-
-    newfs_hfs $RAM_DEV >/dev/null
-
-    mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
-
-    CWD=$(pwd -P)
-
-    cd "$WORKSPACE"
-
-    message "workspace created at $WORKSPACE"
-
-    # Loop over sources
-
-    if [ $# -gt 0 ]; then
-
-        source "$SUPPORT_FOLDER"/etc/config.d/"$1"
-
-        message "Doing $BACKUP_NAME"
-
-        restore
-
-        if [ $? -ne 0 ]; then
-
-            message "$BACKUP_NAME failed... terminating"
-
-            abort 0
-        fi
-
-        message "Completed $BACKUP_NAME"
-    else
-
-        for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
-
-            source "$CONFIG"
-
-            message "Doing $BACKUP_NAME"
-
-            restore
-
-            if [ $? -ne 0 ]; then
-
-                message "$BACKUP_NAME failed... terminating"
-
-                abort 0
-            fi
-
-            message "Completed $BACKUP_NAME"
-        done
-    fi
-
-    # Cleanup
-
-    cleanup
-
-    # Load launch agents
-
-    if [ $SCHEDULED -eq "0" ]; then
-
-        launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
-
-        message "loaded $PERIODIC_LAUNCH_AGENT"
-    fi
-
-    # Done
-
-    ELAPSED=$(($(date "+%s") - $TIMESTAMP))
-
-    DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
-
-    message "restored backup from Cloud in $DELTA"
+  message "restored backup from the Cloud in $DELTA"
 }
 
 main "$@" 2>>"$HOME/Library/Logs/$LOG_FILE"

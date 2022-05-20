@@ -11,7 +11,7 @@
 # Messaging
 
 function message {
-	/usr/local/bin/unbuffer echo "$(date "+%m-%d-%Y %H:%M:%S: $1")"
+  /usr/local/bin/unbuffer echo "$(date "+%m-%d-%Y %H:%M:%S: $1")"
 }
 
 # Readable
@@ -25,74 +25,74 @@ NSLICES="$6"
 
 function upload {
 
-	WAIT_PID=$(cat wait_pid)
+  WAIT_PID=$(cat wait_pid)
 
-	if [ $WAIT_PID -ne 0 ]; then
+  if [ $WAIT_PID -ne 0 ]; then
 
-		message "+ wait on $(printf "$BASENAME.%06d.dar" $(($SLICE - 1)))"
+    message "+ wait on $(printf "$BASENAME.%06d.dar" $(($SLICE - 1)))"
 
-		while kill -0 "$WAIT_PID" 2>/dev/null; do
+    while kill -0 "$WAIT_PID" 2>/dev/null; do
 
-			sleep 0.5
-		done
-	fi
+      sleep 0.5
+    done
+  fi
 
-	message "uploading $ARCHIVE"
+  message "uploading $ARCHIVE"
 
-	( 
-		(/usr/local/bin/rclone copy "$ARCHIVE" "$TARGET" -q) &
-		CHILD_PID=$!
-		/usr/local/bin/par2 c -r20 -n1 -m256 -qq "$ARCHIVE" 1>/dev/null
-		wait $CHILD_PID
-		for PAR in *.par2; do
-			/usr/local/bin/rclone copy "$PAR" "$TARGET" -q
-			rm -f "$PAR"
-		done
-		rm -f "$ARCHIVE"
-		echo -n 0 >wait_pid
-	) &
+  ( 
+    (/usr/local/bin/rclone copy "$ARCHIVE" "$TARGET" -q) &
+    CHILD_PID=$!
+    /usr/local/bin/par2 c -r20 -n1 -m256 -qq "$ARCHIVE" 1>/dev/null
+    wait $CHILD_PID
+    for PAR in *.par2; do
+      /usr/local/bin/rclone copy "$PAR" "$TARGET" -q
+      rm -f "$PAR"
+    done
+    rm -f "$ARCHIVE"
+    echo -n 0 >wait_pid
+  ) &
 
-	echo -n "$!" >wait_pid
+  echo -n "$!" >wait_pid
 }
 
 function download {
 
-	WAIT_PID=$(cat wait_pid)
+  WAIT_PID=$(cat wait_pid)
 
-	if [ $WAIT_PID -ne 0 ]; then
+  if [ $WAIT_PID -ne 0 ]; then
 
-		message "+   wait on $ARCHIVE"
+    message "+   wait on $ARCHIVE"
 
-		while kill -0 "$WAIT_PID" 2>/dev/null; do
+    while kill -0 "$WAIT_PID" 2>/dev/null; do
 
-			sleep 0.5
-		done
-	fi
+      sleep 0.5
+    done
+  fi
 
-	NEXT_SLICE=$(($SLICE + 1))
+  NEXT_SLICE=$(($SLICE + 1))
 
-	if [ $NEXT_SLICE -lt $NSLICES ]; then
+  if [ $NEXT_SLICE -lt $NSLICES ]; then
 
-		ARCHIVE=$(printf "$BASENAME.%06d.dar" "$NEXT_SLICE")
+    ARCHIVE=$(printf "$BASENAME.%06d.dar" "$NEXT_SLICE")
 
-		message "downloading $ARCHIVE"
+    message "downloading $ARCHIVE"
 
-		(
-			/usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-			/usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
-			/usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
-			if [ $? -ne 0 ]; then
-				/usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
-				message "+ repairing $ARCHIVE"
-				/usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
-				rm -f "$ARCHIVE.vol*+*.par2"
-			fi
-			rm -f "$ARCHIVE.par2"
-			echo 0 >wait_pid
-		) &
+    (
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+      /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
+      if [ $? -ne 0 ]; then
+        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+        message "+ repairing $ARCHIVE"
+        /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
+        rm -f "$ARCHIVE.vol*+*.par2"
+      fi
+      rm -f "$ARCHIVE.par2"
+      echo 0 >wait_pid
+    ) &
 
-		echo $! >wait_pid
-	fi
+    echo $! >wait_pid
+  fi
 }
 
 # Switch
@@ -101,109 +101,109 @@ case "$CONTEXT" in
 
 create)
 
-	echo -n "$SLICE" >"$BASENAME".slices
+  echo -n "$SLICE" >"$BASENAME".slices
 
-	BYTES=$(stat -f%z "$ARCHIVE")
+  BYTES=$(stat -f%z "$ARCHIVE")
 
-	if [ $SLICE -gt 1 ]; then
+  if [ $SLICE -gt 1 ]; then
 
-		BYTES=$(($BYTES + $(cat "$BASENAME".bytes)))
-	fi
+    BYTES=$(($BYTES + $(cat "$BASENAME".bytes)))
+  fi
 
-	echo -n "$BYTES" >"$BASENAME".bytes
+  echo -n "$BYTES" >"$BASENAME".bytes
 
-	upload
-	;;
+  upload
+  ;;
 
 extract)
 
-	download
+  download
 
-	if [ $SLICE -gt 1 ]; then
+  if [ $SLICE -gt 1 ]; then
 
-		rm -f $(printf "$BASENAME.%06d.dar" $(($SLICE - 1)))
-	fi
-	;;
+    rm -f $(printf "$BASENAME.%06d.dar" $(($SLICE - 1)))
+  fi
+  ;;
 
 catalogue)
 
-	message "downloading $ARCHIVE"
-	/usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-	/usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
-	message "+ checking $ARCHIVE"
-	/usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
+  message "downloading $ARCHIVE"
+  /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
+  /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+  message "+ checking $ARCHIVE"
+  /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
 
-	if [ $? -ne 0 ]; then
+  if [ $? -ne 0 ]; then
 
-		/usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
-		message "+ repairing $ARCHIVE"
-		/usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
-		rm -f "$ARCHIVE.vol*+*.par2"
-	else
+    /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+    message "+ repairing $ARCHIVE"
+    /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
+    rm -f "$ARCHIVE.vol*+*.par2"
+  else
 
-		message "+ OK"
-	fi
+    message "+ OK"
+  fi
 
-	rm -f $ARCHIVE.par2
+  rm -f $ARCHIVE.par2
 
-	if [ $SLICE -gt 1 ]; then
+  if [ $SLICE -gt 1 ]; then
 
-		ARCHIVE=$(printf "$BASENAME.%06d.dar" 1)
+    ARCHIVE=$(printf "$BASENAME.%06d.dar" 1)
 
-		message "downloading $ARCHIVE"
+    message "downloading $ARCHIVE"
 
-		(
-			/usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-			/usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
-			message "+ checking $ARCHIVE"
-			/usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
-			if [ $? -ne 0 ]; then
-				/usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
-				message "+ repairing $ARCHIVE"
-				/usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
-				rm -f "$ARCHIVE.vol*+*.par2"
-			else
-				message "+ OK"
-			fi
-			rm -f "$ARCHIVE.par2"
-			echo 0 >wait_pid
-		) &
+    (
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+      message "+ checking $ARCHIVE"
+      /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
+      if [ $? -ne 0 ]; then
+        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+        message "+ repairing $ARCHIVE"
+        /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
+        rm -f "$ARCHIVE.vol*+*.par2"
+      else
+        message "+ OK"
+      fi
+      rm -f "$ARCHIVE.par2"
+      echo 0 >wait_pid
+    ) &
 
-		echo $! >wait_pid
-	fi
-	;;
+    echo $! >wait_pid
+  fi
+  ;;
 
 restore)
 
-	ARCHIVE=$(printf "$BASENAME.%06d.dar" "$SLICE")
+  ARCHIVE=$(printf "$BASENAME.%06d.dar" "$SLICE")
 
-	if [ $SLICE -eq 0 ]; then
+  if [ $SLICE -eq 0 ]; then
 
-		SUPPORT_FOLDER="$HOME/Library/Application Support/Cloud Backup"
-		source "$SUPPORT_FOLDER/etc/config"
-		source "$SUPPORT_FOLDER/lib/db.bash"
-		NAME="${BASENAME%.*}"
-		LEVEL="${BASENAME##*.}"
+    SUPPORT_FOLDER="$HOME/Library/Application Support/Cloud Backup"
+    source "$SUPPORT_FOLDER/etc/config"
+    source "$SUPPORT_FOLDER/lib/db.bash"
+    NAME="${BASENAME%.*}"
+    LEVEL="${BASENAME##*.}"
 
-		db_select "$NAME" "$LEVEL"
+    db_select "$NAME" "$LEVEL"
 
-		ARCHIVE=$(printf "$BASENAME.%06d.dar" "$SLICES")
-	fi
+    ARCHIVE=$(printf "$BASENAME.%06d.dar" "$SLICES")
+  fi
 
-	if [ ! -e "$ARCHIVE" ]; then
+  if [ ! -e "$ARCHIVE" ]; then
 
-		message "downloading $ARCHIVE"
-		/usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-		/usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
-		message "+ checking $ARCHIVE"
-		/usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
-		if [ $? -ne 0 ]; then
-			/usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
-			message "+ repairing $ARCHIVE"
-			/usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
-		else
-			message "+ OK"
-		fi
-	fi
-	;;
+    message "downloading $ARCHIVE"
+    /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
+    /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+    message "+ checking $ARCHIVE"
+    /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
+    if [ $? -ne 0 ]; then
+      /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+      message "+ repairing $ARCHIVE"
+      /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
+    else
+      message "+ OK"
+    fi
+  fi
+  ;;
 esac

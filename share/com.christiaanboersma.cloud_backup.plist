@@ -8,7 +8,7 @@
 		<string>/Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist</string>
 	</array>
 	<key>Label</key>
-	<string>net.ddns.christiaanboersma.cloud_backup</string>
+	<string>com.christiaanboersma.cloud_backup</string>
 	<key>LowPriorityIO</key>
 	<true/>
 	<key>Nice</key>

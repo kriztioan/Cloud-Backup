@@ -30,187 +30,182 @@ source "$SUPPORT_FOLDER/lib/manager.bash"
 
 function restore {
 
-    # Check for argument
+  # Check for argument
 
-    if [ "$#" -ne 1 ]; then
+  if [ "$#" -lt 1 ]; then
 
-        return 1
-    fi
+    return 1
+  fi
 
-    # Check for target
+  # Check for target
 
-    message "checking target"
+  message "checking target"
 
-    rclone ls "$TARGET" -q >/dev/null 2>&1
+  rclone ls "$TARGET" -q >/dev/null 2>&1
 
-    if [ ! $? -eq 0 ]; then
+  if [ ! $? -eq 0 ]; then
 
-        message "target ($TARGET) not available... terminating"
+    message "target ($TARGET) not available... terminating"
 
-        return 2
-    fi
+    return 2
+  fi
 
-    db_last "$BACKUP_NAME"
+  db_last "$BACKUP_NAME"
 
-    if [ $? -ne 0 ]; then
+  if [ $? -ne 0 ]; then
 
-        message "no backups found... terminating"
+    message "no backups found... terminating"
 
-        return 3
-    fi
+    return 3
+  fi
 
-    message "checking destination"
+  message "checking destination"
 
-    if [ ! -d "$DESTINATION" ]; then
+  if [ ! -d "$DESTINATION" ]; then
 
-        message "destination ($DESTINATION) does not exist... creating"
+    message "destination ($DESTINATION) does not exist... creating"
 
-        mkdir "$DESTINATION"
-    fi
+    mkdir "$DESTINATION"
+  fi
 
-    # Retrieve last slice
+  # Restore
 
-    echo -n 0 >wait_pid
+  message "dar_manager started"
 
-    #echo "$DAR_SCRIPT" catalogue "$SLICES" "$TARGET" "$SLICES" "$BACKUP_NAME"."$L"
+  message "restoring backup of '$@'"
 
-    # Restore
+  manager_restore "-q -9 6 -O -w -Q \
+              -R '$DESTINATION' \
+        -E \"'$DAR_SCRIPT' restore %b.%N.dar $TARGET %n %b\"" \
+    "$@"
 
-    message "dar_manager started"
+  DAR_CODE=$?
 
-    message "restoring backup of '$1'"
+  message "dar_manager finished with code $DAR_CODE"
 
-    manager_restore "${@:2}" "-q -9 6 -O -w -Q \
-			    -R '$DESTINATION' \
-			    -E \"'$DAR_SCRIPT' restore %b.%N.dar $TARGET %n %b\""
-
-    DAR_CODE=$?
-
-    message "dar_manager finished with code $DAR_CODE"
-
-    return 0
+  return 0
 }
 
 function main {
 
-    # Starting
+  # Starting
 
-    message "starting file restore from Cloud (PID $$)"
+  message "starting file restore from the Cloud (PID $$)"
 
-    TIMESTAMP=$(date +"%s")
+  TIMESTAMP=$(date +"%s")
 
-    # Unload the launch agent
+  # Unload the launch agent
 
-    ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>&1)
+  ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>&1)
 
-    SCHEDULED=$?
+  SCHEDULED=$?
 
-    if [ $SCHEDULED -eq "0" ]; then
+  if [ $SCHEDULED -eq "0" ]; then
 
-        launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+    launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-        message "unloaded $PERIODIC_LAUNCH_AGENT"
-    fi
+    message "unloaded $PERIODIC_LAUNCH_AGENT"
+  fi
 
-    # Check for lock file
+  # Check for lock file
 
-    if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+  if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
 
-        message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+    message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
 
-        PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+    PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
 
-        message "cloud backup already running with pid $PID... terminating"
+    message "cloud backup already running with pid $PID... terminating"
 
-        return 2
-    fi
+    return 2
+  fi
 
-    # Write lock file
+  # Write lock file
 
-    echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
+  echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
 
-    message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
+  message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
 
-    # Connect to data database
+  # Connect to data database
 
-    db_connect
+  db_connect
 
-    if [ "$?" -ne 0 ]; then
+  if [ "$?" -ne 0 ]; then
 
-        message "failed to connect to database... terminating"
+    message "failed to connect to database... terminating"
 
-        exit 0
-    fi
+    exit 0
+  fi
 
-    message "connected to database"
+  message "connected to database"
 
-    # Init manager
+  # Init manager
 
-    manager_init
+  manager_init
 
-    message "manager initialized"
+  message "manager initialized"
 
-    # Create work space
+  # Create work space
 
-    message "creating workspace"
+  message "creating workspace"
 
-    WORKSPACE=$(mktemp -d -t cloud_backup)
+  WORKSPACE=$(mktemp -d -t cloud_backup)
 
-    RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (3 * $DAR_BYTES / 1024) / 10)))
+  RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (3 * $DAR_BYTES / 1024) / 10)))
 
-    if [ "$?" -ne 0 ]; then
+  if [ "$?" -ne 0 ]; then
 
-        message "unable to create workspace... terminating"
+    message "unable to create workspace... terminating"
 
-        exit 0
-    fi
+    exit 0
+  fi
 
-    newfs_hfs $RAM_DEV >/dev/null
+  newfs_hfs $RAM_DEV >/dev/null
 
-    mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
+  mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
 
-    CWD=$(pwd -P)
+  CWD=$(pwd -P)
 
-    cd "$WORKSPACE"
+  cd "$WORKSPACE"
 
-    message "workspace created at $WORKSPACE"
+  message "workspace created at $WORKSPACE"
 
-    # Restore file
+  # Restore file
 
-    source "$SUPPORT_FOLDER"/etc/config.d/"$1"
+  source "$SUPPORT_FOLDER"/etc/config.d/"$1"
 
-    message "Doing $BACKUP_NAME"
+  message "Doing $BACKUP_NAME"
 
-    restore $2
+  restore "${@:2}"
 
-    if [ $? -ne 0 ]; then
+  if [ $? -ne 0 ]; then
 
-        message "Restore failed"
-    else
+    message "Restore failed"
+  else
 
-        message "Completed $BACKUP_NAME"
-    fi
+    message "Completed $BACKUP_NAME"
+  fi
 
-    # Cleanup
+  # Cleanup
 
-    cleanup
+  cleanup
 
-    # Load launch agents
+  # Load launch agents
 
-    if [ $SCHEDULED -eq "0" ]; then
+  if [ $SCHEDULED -eq "0" ]; then
 
-        launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+    launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-        message "loaded $PERIODIC_LAUNCH_AGENT"
-    fi
+    message "loaded $PERIODIC_LAUNCH_AGENT"
+  fi
 
-    # Done
+  # Done
 
-    ELAPSED=$(($(date "+%s") - $TIMESTAMP))
+  ELAPSED=$(($(date "+%s") - $TIMESTAMP))
 
-    DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
+  DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
 
-    message "restored file from Cloud in $DELTA"
+  message "restored file from the Cloud in $DELTA"
 }
 
 main "$@"

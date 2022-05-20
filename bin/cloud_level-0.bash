@@ -30,342 +30,344 @@ source "$SUPPORT_FOLDER/lib/manager.bash"
 
 function backup {
 
-    # Check for target
+  # Check for target
 
-    message "checking target"
+  message "checking target"
 
-    /usr/local/bin/rclone ls "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
+  /usr/local/bin/rclone ls "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
 
-    if [ ! $? -eq 0 ]; then
+  if [ ! $? -eq 0 ]; then
 
-        message "target ($TARGET) not available"
+    message "target ($TARGET) not available"
 
-        return 1
-    fi
+    return 1
+  fi
 
-    # Check for source
+  # Check for source
 
-    message "checking source"
+  message "checking source"
 
-    if [ ! -d "$SOURCE" ]; then
+  if [ ! -d "$SOURCE" ]; then
 
-        message "source ($SOURCE) not available"
+    message "source ($SOURCE) not available"
 
-        return 2
-    fi
+    return 2
+  fi
 
-    # Getting last update
+  # Getting last update
 
-    db_last "$BACKUP_NAME"
+  db_last "$BACKUP_NAME"
 
-    if [ $? -eq 0 ]; then
+  if [ $? -eq 0 ]; then
 
-        message "last update (level-$LEVEL) dated $(date -r $DATE)"
+    message "last update (level-$LEVEL) dated $(date -r $DATE)"
 
-        L=$LEVEL
+    L=$LEVEL
 
-        until [[ $L -lt 0 ]]; do
+    until [[ $L -lt 0 ]]; do
 
-            /usr/local/bin/rclone copy "$TARGET$BACKUP_NAME"."$L".slices . $RCLONE_OPTS 2>/dev/null
+      message "purging $SLICES stale level-$L slice(s)"
 
-            NSLICES=$(cat ./"$BACKUP_NAME"."$L".slices)
+      SLICE=1
 
-            message "purging $NSLICES stale level-$L slice(s)"
+      until [[ $SLICE -gt $SLICES ]]; do
 
-            SLICE=1
+        ARCHIVE=$(printf "$BACKUP_NAME.$L.%06d.dar" $SLICE)
 
-            until [[ $SLICE -gt $NSLICES ]]; do
+        /usr/local/bin/rclone delete "$TARGET$ARCHIVE" $RCLONE_OPTS
 
-                ARCHIVE=$(printf "$BACKUP_NAME.$L.%06d.dar" $SLICE)
+        /usr/local/bin/rclone delete "$TARGET$ARCHIVE.par2" $RCLONE_OPTS
 
-                /usr/local/bin/rclone delete "$TARGET$ARCHIVE" $RCLONE_OPTS
+        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" delete "$TARGET" $RCLONE_OPTS
 
-                /usr/local/bin/rclone delete "$TARGET$ARCHIVE.par2" $RCLONE_OPTS
+        SLICE=$(($SLICE + 1))
+      done
 
-                /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" delete "$TARGET" $RCLONE_OPTS
+      rm ./"$BACKUP_NAME"."$L".slices
 
-                SLICE=$(($SLICE + 1))
-            done
+      /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".slices $RCLONE_OPTS
 
-            rm ./"$BACKUP_NAME"."$L".slices
+      db_delete "$BACKUP_NAME" "$L"
 
-            /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".slices $RCLONE_OPTS
+      if [[ $SLICES -gt 0 ]]; then
 
-            db_delete "$BACKUP_NAME" "$L"
+        /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".catalogue.1.dar $RCLONE_OPTS
+      fi
 
-            if [[ $NSLICES -gt 0 ]]; then
+      L=$(($L - 1))
+    done
+  fi
 
-                /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".catalogue.1.dar $RCLONE_OPTS
-            fi
+  # Do dar
 
-            L=$(($L - 1))
-        done
-    fi
+  echo -n 0 >wait_pid
 
-    # Do dar
+  message "dar started"
 
-    echo -n 0 >wait_pid
+  message "doing a level-0 backup"
 
-    message "dar started"
+  caffeinate /usr/local/bin/dar -q -Q \
+    -c "$BACKUP_NAME".0 \
+    -s "$DAR_BYTES" \
+    -R "$SOURCE" \
+    -E "'$DAR_SCRIPT' create %b.%N.dar $TARGET %n $BACKUP_NAME.0" \
+    --min-digits 6 \
+    --on-fly-isolate "$BACKUP_NAME.0.catalogue" \
+    --exclude .DS_Store \
+    --prune .DocumentRevisions-V100 \
+    --prune .TemporaryItems \
+    --prune .Trashes
 
-    message "doing a level-0 backup"
+  DAR_CODE=$?
 
-    caffeinate /usr/local/bin/dar -q -Q \
-        -c "$BACKUP_NAME".0 \
-        -s "$DAR_BYTES" \
-        -R "$SOURCE" \
-        -E "'$DAR_SCRIPT' create %b.%N.dar $TARGET %n $BACKUP_NAME.0" \
-        --min-digits 6 \
-        --on-fly-isolate "$BACKUP_NAME.0.catalogue" \
-        --exclude .DS_Store \
-        --prune .DocumentRevisions-V100 \
-        --prune .TemporaryItems \
-        --prune .Trashes
+  message "dar finished with code $DAR_CODE"
 
-    DAR_CODE=$?
+  if [ $DAR_CODE -ne 0 ]; then
 
-    message "dar finished with code $DAR_CODE"
+    message "please check the log file for any errors/warnings"
+  fi
 
-    if [ $DAR_CODE -ne 0 ]; then
+  WAIT_PID=$(cat wait_pid)
 
-        message "please check the log file for any errors/warnings"
-    fi
+  if [ $WAIT_PID -ne 0 ]; then
 
-    WAIT_PID=$(cat wait_pid)
+    message "- wait on $(printf "$BACKUP_NAME.0.%06d.dar" $(cat "$BACKUP_NAME".0.slices))"
 
-    if [ $WAIT_PID -ne 0 ]; then
+    while kill -0 "$WAIT_PID" 2>/dev/null; do
 
-        message "- wait on $(printf "$BACKUP_NAME.0.%06d.dar" $(cat "$BACKUP_NAME".0.slices))"
+      sleep 0.5
+    done
+  fi
 
-        while kill -0 "$WAIT_PID" 2>/dev/null; do
+  BYTES=$(cat ./"$BACKUP_NAME".0.bytes)
 
-            sleep 0.5
-        done
-    fi
+  message "archived $(human $BYTES)"
 
-    BYTES=$(cat ./"$BACKUP_NAME".0.bytes)
+  message "archiving level-0 catalogue"
 
-    message "archived $(human $BYTES)"
+  /usr/local/bin/rclone copy "$BACKUP_NAME".0.catalogue.1.dar "$TARGET" $RCLONE_OPTS
 
-    message "archiving level-0 catalogue"
+  # Archive slice(s)
 
-    /usr/local/bin/rclone copy "$BACKUP_NAME".0.catalogue.1.dar "$TARGET" $RCLONE_OPTS
+  message "archiving slice(s)"
 
-    # Archive slice(s)
+  /usr/local/bin/rclone copy "$BACKUP_NAME".0.slices "$TARGET" $RCLONE_OPTS
 
-    message "archiving slice(s)"
+  # Commit to database
 
-    /usr/local/bin/rclone copy "$BACKUP_NAME".0.slices "$TARGET" $RCLONE_OPTS
+  message "committing to database"
 
-    # Commit to database
+  db_insert "$BACKUP_NAME" 0 $BYTES $(cat "$BACKUP_NAME".0.slices)
 
-    message "committing to database"
+  # Add catalogue to manager
 
-    db_insert "$BACKUP_NAME" 0 $BYTES $(cat "$BACKUP_NAME".0.slices)
+  message "adding catalogue to manager"
 
-    # Add catalogue to manager
+  manager_add "$BACKUP_NAME".0.catalogue "$BACKUP_NAME".0
 
-    message "adding catalogue to manager"
+  rm -f "$BACKUP_NAME".0.catalogue.1.dar
 
-    manager_add "$BACKUP_NAME".0.catalogue "$BACKUP_NAME".0
-
-    rm -f "$BACKUP_NAME".0.catalogue.1.dar
-
-    return 0
+  return 0
 }
 
 function main {
 
-    # Starting
+  # Starting
 
-    TIMESTAMP=$(date +"%s")
+  TIMESTAMP=$(date +"%s")
 
-    message "starting level-0 cloud backup (PID $$)"
+  message "starting level-0 cloud backup (PID $$)"
 
-    # Unload the launch agent
+  # Unload the launch agent
 
-    ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>/dev/null)
+  ACTIVE=$(launchctl list "$PERIODIC_LAUNCH_AGENT" >/dev/null 2>/dev/null)
 
-    if [ $? -eq "0" ]; then
+  if [ $? -eq "0" ]; then
 
-        launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+    launchctl unload "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-        message "unloaded $PERIODIC_LAUNCH_AGENT"
+    message "unloaded $PERIODIC_LAUNCH_AGENT"
+  fi
+
+  # Check for lock file
+
+  if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+
+    message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+
+    PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+
+    message "cloud backup already running with pid $PID... terminating"
+
+    exit 0
+  fi
+
+  # Connect to data database
+
+  db_connect
+
+  if [ "$?" -ne 0 ]; then
+
+    message "failed to connect to database... terminating"
+
+    exit 0
+  fi
+
+  message "connected to database"
+
+  # Init manager
+
+  manager_init
+
+  message "manager initialized"
+
+  # Create work space
+
+  message "creating workspace"
+
+  WORKSPACE=$(mktemp -d -t cloud_backup)
+
+  RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (2 * $DAR_BYTES / 1024) / 10)))
+
+  if [ "$?" -ne 0 ]; then
+
+    message "unable to create workspace... terminating"
+
+    exit 0
+  fi
+
+  newfs_hfs $RAM_DEV >/dev/null
+
+  mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
+
+  CWD=$(pwd -P)
+
+  cd "$WORKSPACE"
+
+  message "workspace created at $WORKSPACE"
+
+  # Write lock file
+
+  echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
+
+  message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
+
+  # Loop over sources
+
+  if [ $# -gt 0 ]; then
+
+    source "$SUPPORT_FOLDER"/etc/config.d/"$1"
+
+    message "doing $BACKUP_NAME"
+
+    backup
+
+    if [ $? -ne 0 ]; then
+
+      message "$BACKUP_NAME failed... terminating"
+
+      abort 0
     fi
 
-    # Check for lock file
+    message "completed $BACKUP_NAME"
+  else
 
-    if [ -e "$SUPPORT_FOLDER/var/$LOCK_FILE" ]; then
+    for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
 
-        message "lock file found at $SUPPORT_FOLDER/var/$LOCK_FILE"
+      source "$CONFIG"
 
-        PID=$(cat "$SUPPORT_FOLDER/var/$LOCK_FILE")
+      message "Doing $BACKUP_NAME"
 
-        message "cloud backup already running with pid $PID... terminating"
+      backup
 
-        exit 0
-    fi
+      if [ $? -ne 0 ]; then
 
-    # Connect to data database
+        message "$BACKUP_NAME failed... terminating"
 
-    db_connect
+        abort 0
+      fi
 
-    if [ "$?" -ne 0 ]; then
+      message "completed $BACKUP_NAME"
+    done
+  fi
 
-        message "failed to connect to database... terminating"
+  # Save database
 
-        exit 0
-    fi
+  /usr/local/bin/rclone copy "$SUPPORT_FOLDER/share/$DB_FILE" "$TARGET" $RCLONE_OPTS
 
-    message "connected to database"
+  message "database saved"
 
-    # Init manager
+  # Save manager
 
-    manager_init
+  /usr/local/bin/rclone copy "$SUPPORT_FOLDER/share/$MANAGER_FILE" "$TARGET" $RCLONE_OPTS
 
-    message "manager initialized"
+  message "manager saved"
 
-    # Create work space
+  # Save timestamp
 
-    message "creating workspace"
+  date +"%s" >"$SUPPORT_FOLDER/var/$TIMESTAMP_FILE"
 
-    WORKSPACE=$(mktemp -d -t cloud_backup)
+  /usr/local/bin/rclone copy "$SUPPORT_FOLDER/var/$TIMESTAMP_FILE" "$TARGET" $RCLONE_OPTS
 
-    RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (2 * $DAR_BYTES / 1024) / 10)))
+  message "timestamp saved"
 
-    if [ "$?" -ne 0 ]; then
+  # Cleanup
 
-        message "unable to create workspace... terminating"
+  cleanup
 
-        exit 0
-    fi
+  # Write launch agent
 
-    newfs_hfs $RAM_DEV >/dev/null
-
-    mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
-
-    CWD=$(pwd -P)
-
-    cd "$WORKSPACE"
-
-    message "workspace created at $WORKSPACE"
-
-    # Write lock file
-
-    echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
-
-    message "lock file written at $SUPPORT_FOLDER/var/$LOCK_FILE"
-
-    # Loop over sources
-
-    if [ $# -gt 0 ]; then
-
-        source "$SUPPORT_FOLDER"/etc/config.d/"$1"
-
-        message "Doing $BACKUP_NAME"
-
-        backup
-
-        if [ $? -ne 0 ]; then
-
-            message "$BACKUP_NAME failed... terminating"
-
-            abort 0
-        fi
-
-        message "Completed $BACKUP_NAME"
-    else
-
-        for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
-
-            source "$CONFIG"
-
-            message "Doing $BACKUP_NAME"
-
-            backup
-
-            if [ $? -ne 0 ]; then
-
-                message "$BACKUP_NAME failed... terminating"
-
-                abort 0
-            fi
-
-            message "Completed $BACKUP_NAME"
-        done
-    fi
-
-    # Save database
-
-    /usr/local/bin/rclone copy "$SUPPORT_FOLDER/share/$DB_FILE" "$TARGET" $RCLONE_OPTS
-
-    message "database saved"
-
-    # Save timestamp
-
-    date +"%s" >"$SUPPORT_FOLDER/var/$TIMESTAMP_FILE"
-
-    /usr/local/bin/rclone copy "$SUPPORT_FOLDER/var/$TIMESTAMP_FILE" "$TARGET" $RCLONE_OPTS
-
-    message "timestamp saved"
-
-    # Cleanup
-
-    cleanup
-
-    # Write launch agent
-
-    cat >"$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist" <<EOL
+  cat >"$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist" <<EOL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>StartCalendarInterval</key>
-	<dict>
-		<key>Minute</key>
-	   	<integer>0</integer>
-		<key>Hour</key>
-		<integer>10</integer>
-		<key>Day</key>
-		<integer>$(date -v +${DAY_INTERVAL}d +"%d")</integer>
-		<key>Month</key>
-		<integer>$(date -v +${DAY_INTERVAL}d +"%m")</integer>
-	</dict>
-	<key>Label</key>
-	<string>net.ddns.christiaanboersma.cloud_backup.periodic</string>
-	<key>LowPriorityIO</key>
-	<true/>
-	<key>Nice</key>
-	<integer>1</integer>
-	<key>Program</key>
-	<string>/bin/sh</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>sh</string>
-		<string>-c</string>
-		<string>$HOME/Library/Application\ Support/Cloud\ Backup/bin/cloud_level-x.bash</string>
-	</array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Minute</key>
+       <integer>0</integer>
+    <key>Hour</key>
+    <integer>10</integer>
+    <key>Day</key>
+    <integer>$(date -v +${DAY_INTERVAL}d +"%d")</integer>
+    <key>Month</key>
+    <integer>$(date -v +${DAY_INTERVAL}d +"%m")</integer>
+  </dict>
+  <key>Label</key>
+  <string>com.christiaanboersma.cloud_backup.periodic</string>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>1</integer>
+  <key>Program</key>
+  <string>/bin/sh</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>sh</string>
+    <string>-c</string>
+    <string>$HOME/Library/Application\ Support/Cloud\ Backup/bin/cloud_level-x.bash</string>
+  </array>
 </dict>
 </plist>
 EOL
 
-    message "written $PERIODIC_LAUNCH_AGENT"
+  message "written $PERIODIC_LAUNCH_AGENT"
 
-    # Load launch agent
+  # Load launch agent
 
-    launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
+  launchctl load "$SUPPORT_FOLDER/share/$PERIODIC_LAUNCH_AGENT.plist"
 
-    message "loaded $PERIODIC_LAUNCH_AGENT"
+  message "loaded $PERIODIC_LAUNCH_AGENT"
 
-    message "level-1 backups scheduled to run at 10:00 AM on $(date -v +${DAY_INTERVAL}d +"%A, %B %e %Y")"
+  message "level-1 backups scheduled to run at 10:00 AM on $(date -v +${DAY_INTERVAL}d +"%A, %B %e %Y")"
 
-    # Done
+  # Done
 
-    ELAPSED=$(($(date "+%s") - $TIMESTAMP))
+  ELAPSED=$(($(date "+%s") - $TIMESTAMP))
 
-    DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
+  DELTA=$(printf "%03d:%02d:%02d" $(($ELAPSED / 3600)) $((($ELAPSED % 3600) / 60)) $(($ELAPSED % 3600 % 60)))
 
-    message "completed level-0 cloud backup in $DELTA"
+  message "completed level-0 cloud backup in $DELTA"
 }
 
 main "$@" 2>>"$HOME/Library/Logs/$LOG_FILE"
