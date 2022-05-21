@@ -159,6 +159,31 @@ function main {
 
   message "manager initialized"
 
+  # Create work space
+
+  message "creating workspace"
+
+  WORKSPACE=$(mktemp -d -t cloud_backup)
+
+  RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (2 * $DAR_BYTES / 1024) / 10)))
+
+  if [ "$?" -ne 0 ]; then
+
+    message "unable to create workspace... terminating"
+
+    exit 0
+  fi
+
+  newfs_hfs $RAM_DEV >/dev/null
+
+  mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
+
+  CWD=$(pwd -P)
+
+  cd "$WORKSPACE"
+
+  message "workspace created at $WORKSPACE"
+
   # Write lock file
 
   echo $$ >"$SUPPORT_FOLDER/var/$LOCK_FILE"
@@ -220,11 +245,9 @@ function main {
 
   message "manager saved"
 
-  # Remove lock file
+  # Cleanup
 
-  rm "$SUPPORT_FOLDER/var/$LOCK_FILE"
-
-  message "removed lock file at $SUPPORT_FOLDER/var/$LOCK_FILE"
+  cleanup
 
   # Load launch agent
 

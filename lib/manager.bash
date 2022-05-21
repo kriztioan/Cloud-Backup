@@ -40,7 +40,11 @@ function manager_trim {
 
   unset GREP_OPTIONS
 
-  LIST=$(/usr/local/bin/dar_manager -B "$SUPPORT_FOLDER/share/$MANAGER_FILE" --list)
+  TMP_MANAGER_FILE="$WORKSPACE/$MANAGER_FILE"
+
+  mv "$SUPPORT_FOLDER/share/$MANAGER_FILE"  "$TMP_MANAGER_FILE"
+
+  LIST=$(/usr/local/bin/dar_manager -B "$TMP_MANAGER_FILE" --list)
 
   LEVELS=($(echo "$LIST" | /usr/bin/grep "$1" | /usr/bin/awk '{print $3}' | /usr/bin/sed -E "s|$1\.(.*)|\1|"))
 
@@ -52,9 +56,9 @@ function manager_trim {
 
     NUMBERS=($(echo "$LIST" | /usr/bin/grep "$1" | /usr/bin/awk '{print $1}'))
 
-    /usr/local/bin/dar_manager -B "$SUPPORT_FOLDER/share/$MANAGER_FILE" --delete ${NUMBERS[${#NUMBERS[@]} - 1]}
+    /usr/local/bin/dar_manager -B "$TMP_MANAGER_FILE" --delete ${NUMBERS[${#NUMBERS[@]} - 1]}
 
-    LIST=$(/usr/local/bin/dar_manager -B "$SUPPORT_FOLDER/share/$MANAGER_FILE" --list)
+    LIST=$(/usr/local/bin/dar_manager -B "$TMP_MANAGER_FILE" --list)
 
     LEVELS=($(echo "$LIST" | /usr/bin/grep "$1" | /usr/bin/awk '{print $3}' | /usr/bin/sed -E "s|$1\.(.*)|\1|"))
 
@@ -64,6 +68,8 @@ function manager_trim {
   done
 
   message 100%
+
+  mv "$TMP_MANAGER_FILE" "$SUPPORT_FOLDER/share/$MANAGER_FILE"
 
   GREP_OPTIONS=$STORE
 }
