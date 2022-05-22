@@ -65,27 +65,7 @@ function trim {
 
     until [[ "$L" -le "$TRIM_LEVEL" ]]; do
 
-      SLICE=1
-
-      until [[ $SLICE -gt $SLICES ]]; do
-
-        ARCHIVE=$(printf "$BACKUP_NAME.$L.%06d.dar" $SLICE)
-
-        /usr/local/bin/rclone delete "$TARGET$ARCHIVE" $RCLONE_OPTS
-
-        /usr/local/bin/rclone delete "$TARGET$ARCHIVE.par2" $RCLONE_OPTS
-
-        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" delete "$TARGET" $RCLONE_OPTS
-
-        SLICE=$(($SLICE + 1))
-      done
-
-      /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".slices $RCLONE_OPTS
-
-      if [[ $SLICES -gt 0 ]]; then
-
-        /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".catalogue.1.dar $RCLONE_OPTS
-      fi
+      /usr/local/bin/rclone --include "$BACKUP_NAME.$L.*" delete "$TARGET" $RCLONE_OPTS
 
       L=$(($L - 1))
 
@@ -267,4 +247,4 @@ function main {
   message "completed trimming cloud backup in $DELTA"
 }
 
-main "$@" 2>>"$HOME/Library/Logs/$LOG_FILE"
+main "$@" >>"$HOME/Library/Logs/$LOG_FILE" 2>&1

@@ -247,4 +247,4 @@ function main {
   message "restored backup from the Cloud in $DELTA"
 }
 
-main "$@" 2>>"$HOME/Library/Logs/$LOG_FILE"
+main "$@" >>"$HOME/Library/Logs/$LOG_FILE" 2>&1

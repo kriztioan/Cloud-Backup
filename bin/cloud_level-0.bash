@@ -62,40 +62,24 @@ function backup {
 
     message "last update (level-$LEVEL) dated $(date -r $DATE)"
 
+    NLEVEL=$LEVEL
+
+    message 0%
+
     L=$LEVEL
 
     until [[ $L -lt 0 ]]; do
 
-      message "purging $SLICES stale level-$L slice(s)"
+      /usr/local/bin/rclone --include "$BACKUP_NAME.$L.*" delete "$TARGET" $RCLONE_OPTS
 
-      SLICE=1
+      PERC=$((100 - (100 * $L) / $NLEVEL)
 
-      until [[ $SLICE -gt $SLICES ]]; do
-
-        ARCHIVE=$(printf "$BACKUP_NAME.$L.%06d.dar" $SLICE)
-
-        /usr/local/bin/rclone delete "$TARGET$ARCHIVE" $RCLONE_OPTS
-
-        /usr/local/bin/rclone delete "$TARGET$ARCHIVE.par2" $RCLONE_OPTS
-
-        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" delete "$TARGET" $RCLONE_OPTS
-
-        SLICE=$(($SLICE + 1))
-      done
-
-      rm ./"$BACKUP_NAME"."$L".slices
-
-      /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".slices $RCLONE_OPTS
-
-      db_delete "$BACKUP_NAME" "$L"
-
-      if [[ $SLICES -gt 0 ]]; then
-
-        /usr/local/bin/rclone delete "$TARGET$BACKUP_NAME"."$L".catalogue.1.dar $RCLONE_OPTS
-      fi
+      message $PERC%
 
       L=$(($L - 1))
     done
+
+    message 100%
   fi
 
   # Do dar
@@ -370,4 +354,4 @@ EOL
   message "completed level-0 cloud backup in $DELTA"
 }
 
-main "$@" 2>>"$HOME/Library/Logs/$LOG_FILE"
+main "$@" >>"$HOME/Library/Logs/$LOG_FILE" 2>&1
