@@ -37,7 +37,7 @@ function cleanup {
 
   cd "$CWD"
 
-  diskutil quiet unmount "$WORKSPACE"
+  umount -f "$WORKSPACE"
 
   diskutil quiet eject $RAM_DEV
 
