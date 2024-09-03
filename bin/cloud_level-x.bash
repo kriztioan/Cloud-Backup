@@ -301,20 +301,23 @@ function main {
 
   if [ $# -gt 0 ]; then
 
-    source "$SUPPORT_FOLDER"/etc/config.d/"$1"
+    for CONFIG in "$@"; do
 
-    message "doing $BACKUP_NAME"
+      source "$SUPPORT_FOLDER"/etc/config.d/"$CONFIG"
 
-    backup
+      message "doing $BACKUP_NAME"
 
-    if [ $? -ne 0 ]; then
+      backup
 
-      message "$BACKUP_NAME failed... terminating"
+      if [ $? -ne 0 ]; then
 
-      abort 0
-    fi
+        message "$BACKUP_NAME failed... terminating"
 
-    message "completed $BACKUP_NAME"
+        abort 0
+      fi
+
+      message "completed $BACKUP_NAME"
+    done
   else
 
     for CONFIG in "$SUPPORT_FOLDER"/etc/config.d/*; do
