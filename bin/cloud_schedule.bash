@@ -116,7 +116,7 @@ function main {
 
   message "checking network"
 
-  SSID=$(networksetup -getairportnetwork en0 | awk '{split($0,x," "); print x[4]}')
+  SSID=$(ipconfig getsummary en0 | awk -F ' SSID : '  '/ SSID : / {print $2}')
 
   if [ -z "$SSID" ]; then
 
