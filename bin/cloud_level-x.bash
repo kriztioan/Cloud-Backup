@@ -129,13 +129,13 @@ function backup {
     --prune ".TemporaryItems" \
     --prune ".Trashes"
 
-  DAR_CODE=$?
-
   rm -f "$BACKUP_NAME".$(($LEVEL - 1))".catalogue"
 
-  message "dar finished with code $DAR_CODE"
+  DAR_CODE=$?
 
   if [ $DAR_CODE -ne 0 ]; then
+
+    message "dar finished with code $DAR_CODE"
 
     message "please check the log file for any errors/warnings"
 

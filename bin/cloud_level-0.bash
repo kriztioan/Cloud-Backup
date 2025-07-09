@@ -104,9 +104,9 @@ function backup {
 
   DAR_CODE=$?
 
-  message "dar finished with code $DAR_CODE"
-
   if [ $DAR_CODE -ne 0 ]; then
+
+    message "dar finished with code $DAR_CODE"
 
     message "please check the log file for any errors/warnings"
   fi
