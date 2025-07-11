@@ -30,7 +30,7 @@ function restore {
 
   message "checking target"
 
-  rclone ls "$TARGET" -q >/dev/null 2>&1
+  rclone about "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
 
   if [ ! $? -eq 0 ]; then
 
@@ -65,7 +65,7 @@ function restore {
 
     # Retrieve slices
 
-    rclone copy "$TARGET$BACKUP_NAME"."$L".slices . -q >/dev/null 2>&1
+    rclone copy "$TARGET$BACKUP_NAME"."$L".slices . $RCLONE_OPTS >/dev/null 2>&1
 
     NSLICES=$(cat "$BACKUP_NAME"."$L".slices)
 

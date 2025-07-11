@@ -34,7 +34,7 @@ function trim {
 
   message "checking target"
 
-  /usr/local/bin/rclone ls "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
+  /usr/local/bin/rclone about "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
 
   if [ ! $? -eq 0 ]; then
 

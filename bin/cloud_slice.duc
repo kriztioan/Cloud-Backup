@@ -39,13 +39,13 @@ function upload {
 
   message "uploading $ARCHIVE"
 
-  ( 
-    (/usr/local/bin/rclone copy "$ARCHIVE" "$TARGET" -q) &
+  (
+    (/usr/local/bin/rclone copy "$ARCHIVE" "$TARGET" $RCLONE_OPTS) &
     CHILD_PID=$!
     /usr/local/bin/par2 c -r20 -n1 -m256 -qq "$ARCHIVE" 1>/dev/null
     wait $CHILD_PID
     for PAR in *.par2; do
-      /usr/local/bin/rclone copy "$PAR" "$TARGET" -q
+      /usr/local/bin/rclone copy "$PAR" "$TARGET" $RCLONE_OPTS
       rm -f "$PAR"
     done
     rm -f "$ARCHIVE"
@@ -78,11 +78,11 @@ function download {
     message "downloading $ARCHIVE"
 
     (
-      /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-      /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . $RCLONE_OPTS
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . $RCLONE_OPTS
       /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
       if [ $? -ne 0 ]; then
-        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . $RCLONE_OPTS
         message "+ repairing $ARCHIVE"
         /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
         rm -f "$ARCHIVE.vol*+*.par2"
@@ -128,14 +128,14 @@ extract)
 catalogue)
 
   message "downloading $ARCHIVE"
-  /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-  /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+  /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . $RCLONE_OPTS
+  /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . $RCLONE_OPTS
   message "+ checking $ARCHIVE"
   /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
 
   if [ $? -ne 0 ]; then
 
-    /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+    /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . $RCLONE_OPTS
     message "+ repairing $ARCHIVE"
     /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
     rm -f "$ARCHIVE.vol*+*.par2"
@@ -153,12 +153,12 @@ catalogue)
     message "downloading $ARCHIVE"
 
     (
-      /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-      /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . $RCLONE_OPTS
+      /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . $RCLONE_OPTS
       message "+ checking $ARCHIVE"
       /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
       if [ $? -ne 0 ]; then
-        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+        /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . $RCLONE_OPTS
         message "+ repairing $ARCHIVE"
         /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
         rm -f "$ARCHIVE.vol*+*.par2"
@@ -193,12 +193,12 @@ restore)
   if [ ! -e "$ARCHIVE" ]; then
 
     message "downloading $ARCHIVE"
-    /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . -q
-    /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . -q
+    /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . $RCLONE_OPTS
+    /usr/local/bin/rclone copy "$TARGET$ARCHIVE.par2" . $RCLONE_OPTS
     message "+ checking $ARCHIVE"
     /usr/local/bin/par2 v -m256 -qq "$ARCHIVE"
     if [ $? -ne 0 ]; then
-      /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . -q
+      /usr/local/bin/rclone --include "$ARCHIVE.vol*+*.par2" copy "$TARGET" . $RCLONE_OPTS
       message "+ repairing $ARCHIVE"
       /usr/local/bin/par2 r -m256 -qq "$ARCHIVE"
     else

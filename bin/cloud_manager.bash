@@ -34,7 +34,7 @@ function manage {
 
   message "checking target"
 
-  /usr/local/bin/rclone ls "$TARGET" -q >/dev/null 2>&1
+  /usr/local/bin/rclone about "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
 
   if [ ! $? -eq 0 ]; then
 
@@ -60,7 +60,7 @@ function manage {
 
   while [ $L -lt $LEVEL ]; do
 
-    /usr/local/bin/rclone copy "$TARGET$BACKUP_NAME"."$L".catalogue.1.dar . -q 2>/dev/null
+    /usr/local/bin/rclone copy "$TARGET$BACKUP_NAME"."$L".catalogue.1.dar . $RCLONE_OPTS 2>/dev/null
 
     if [ ! $? -eq 0 ]; then
 

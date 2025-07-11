@@ -41,7 +41,7 @@ function restore {
 
   message "checking target"
 
-  rclone ls "$TARGET" -q >/dev/null 2>&1
+  rclone about "$TARGET" $RCLONE_OPTS >/dev/null 2>&1
 
   if [ ! $? -eq 0 ]; then
 
