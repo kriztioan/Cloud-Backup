@@ -116,7 +116,7 @@ function main {
 
   message "checking network"
 
-  SSID=$(ipconfig getsummary en0 | awk -F ' SSID : '  '/ SSID : / {print $2}')
+  SSID=$(system_profiler SPAirPortDataType | awk '/Current Network Information:/ {getline;$1=$1;printf "%s", substr($1, 1, length($1)-1); exit}')
 
   if [ -z "$SSID" ]; then
 
