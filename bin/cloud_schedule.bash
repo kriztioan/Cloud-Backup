@@ -116,7 +116,7 @@ function main {
 
   message "checking network"
 
-  SSID=$(system_profiler SPAirPortDataType | awk '/Current Network Information:/ {getline;$1=$1;printf "%s", substr($1, 1, length($1)-1); exit}')
+  SSID=$("$SUPPORT_FOLDER"/lib/WiFi.app/Contents/MacOS/wifi | plutil -extract "ssid" raw -n -)
 
   if [ -z "$SSID" ]; then
 
