@@ -37,9 +37,12 @@ function cleanup {
 
   cd "$CWD"
 
-  umount -f "$WORKSPACE"
+  if [ ! -z ${RAM_DEV+x} ]; then
 
-  diskutil quiet eject $RAM_DEV
+      umount -f "$WORKSPACE"
+
+      diskutil quiet eject $RAM_DEV
+  fi
 
   rm -rf "$WORKSPACE"
 

@@ -175,7 +175,19 @@ catalogue)
 
 restore)
 
+  PREV_BASENAME=$(cat prev_basename)
+
+  if [ "$BASENAME" != "$PREV_BASENAME" ]; then
+
+    rm -f "$PREV_BASENAME".*
+
+    rm -f "$PREV_BASENAME ".*
+
+    echo "$BASENAME" >prev_basename
+  fi
+
   ARCHIVE=$(printf "$BASENAME.%06d.dar" "$SLICE")
+  ARCHIVE_WITH_SPACE=$(printf "$BASENAME .%06d.dar" "$SLICE")
 
   if [ $SLICE -eq 0 ]; then
 
@@ -188,9 +200,10 @@ restore)
     db_select "$NAME" "$LEVEL"
 
     ARCHIVE=$(printf "$BASENAME.%06d.dar" "$SLICES")
+    ARCHIVE_WITH_SPACE=$(printf "$BASENAME .%06d.dar" "$SLICES")
   fi
 
-  if [ ! -e "$ARCHIVE" ]; then
+  if [ ! -e "$ARCHIVE_WITH_SPACE" ]; then
 
     message "downloading $ARCHIVE"
     /usr/local/bin/rclone copy "$TARGET$ARCHIVE" . $RCLONE_OPTS
@@ -204,6 +217,7 @@ restore)
     else
       message "+ OK"
     fi
+    mv "$ARCHIVE" "$ARCHIVE_WITH_SPACE"
   fi
   ;;
 esac

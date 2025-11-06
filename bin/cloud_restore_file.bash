@@ -16,7 +16,7 @@ SUPPORT_FOLDER="$HOME/Library/Application Support/Cloud Backup"
 
 source "$SUPPORT_FOLDER/etc/config"
 
-# Source auxilary functions
+# Source auxiliary functions
 
 source "$SUPPORT_FOLDER/lib/aux.bash"
 
@@ -74,16 +74,20 @@ function restore {
 
   message "restoring backup of '$@'"
 
-  manager_restore "-q -9 6 -O -w -Q \
-              -R '$DESTINATION' \
-        -E \"'$DAR_SCRIPT' restore %b.%N.dar $TARGET %n %b\"" \
+  touch prev_basename
+
+  manager_restore "-q -9 6 -O -w -Q -al \
+    -R '$DESTINATION' \
+    -E \"'$DAR_SCRIPT' restore %b $TARGET %n %b\"" \
     "$@"
 
   DAR_CODE=$?
 
   message "dar_manager finished with code $DAR_CODE"
 
-  return 0
+  rm -f prev_basename
+
+  return $DAR_CODE
 }
 
 function main {
@@ -150,19 +154,6 @@ function main {
   message "creating workspace"
 
   WORKSPACE=$(mktemp -d -t cloud_backup)
-
-  RAM_DEV=$(hdiutil attach -agent hdid -nomount ram://$((15 * 2 * (3 * $DAR_BYTES / 1024) / 10)))
-
-  if [ "$?" -ne 0 ]; then
-
-    message "unable to create workspace... terminating"
-
-    exit 0
-  fi
-
-  newfs_hfs $RAM_DEV >/dev/null
-
-  mount -o nobrowse -o noatime -t hfs ${RAM_DEV} ${WORKSPACE}
 
   CWD=$(pwd -P)
 

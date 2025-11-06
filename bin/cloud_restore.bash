@@ -16,7 +16,7 @@ SUPPORT_FOLDER="$HOME/Library/Application Support/Cloud Backup"
 
 source "$SUPPORT_FOLDER/etc/config"
 
-# Source auxilary functions
+# Source auxiliary functions
 
 source "$SUPPORT_FOLDER/lib/aux.bash"
 
