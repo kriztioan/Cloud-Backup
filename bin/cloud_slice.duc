@@ -179,9 +179,10 @@ restore)
 
   if [ "$BASENAME" != "$PREV_BASENAME" ]; then
 
-    rm -f "$PREV_BASENAME".*
-
-    rm -f "$PREV_BASENAME ".*
+    if [ -n "$PREV_BASENAME" ]; then
+      rm -f "$PREV_BASENAME".*
+      rm -f "$PREV_BASENAME ".*
+    fi
 
     echo "$BASENAME" >prev_basename
   fi

@@ -31,7 +31,7 @@ function manager_add {
 
 function manager_restore {
 
-  /usr/local/bin/dar_manager -B "$SUPPORT_FOLDER/share/$MANAGER_FILE" -ai -Q --ignore-when-removed -e "$1" -r "${@:2}"
+  /usr/local/bin/dar_manager -B "$SUPPORT_FOLDER/share/$MANAGER_FILE" -ai --ignore-when-removed -e "$1" -r "${@:2}"
 }
 
 function manager_trim {

@@ -76,7 +76,7 @@ function restore {
 
   touch prev_basename
 
-  manager_restore "-q -9 6 -O -w -Q -al \
+  manager_restore "-q -9 6 -O -w -al \
     -R '$DESTINATION' \
     -E \"'$DAR_SCRIPT' restore %b $TARGET %n %b\"" \
     "$@"

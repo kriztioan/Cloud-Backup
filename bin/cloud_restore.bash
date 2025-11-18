@@ -81,7 +81,7 @@ function restore {
 
     message "restoring level-$L backup"
 
-    /usr/local/bin/dar -x "$BACKUP_NAME"."$L" -q -9 6 -O -w -Q \
+    /usr/local/bin/dar -x "$BACKUP_NAME"."$L" -q -9 6 -O -w \
       -R "$DESTINATION" \
       -E "'$DAR_SCRIPT' extract %b.%N.dar $TARGET %n %b $NSLICES"
 
